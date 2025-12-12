@@ -10,7 +10,7 @@ public abstract class ScreenGrabber
 {
     public static bool IsCapturing { get; private set; }
 
-    public static Action<Bitmap>? OnCaptured { get; set; }
+    public static Action<Bitmap, bool>? OnCaptured { get; set; }
 
     private static TaskCompletionSource<Bitmap?>? _captureTaskCompletionSource;
 
@@ -56,13 +56,14 @@ public abstract class ScreenGrabber
     /// </summary>
     /// <param name="isAuxiliary">是否显示辅助线</param>
     /// <returns>返回捕获的 Bitmap，如果用户取消则返回 null</returns>
-    public static Bitmap? CaptureDialog(bool isAuxiliary = false)
+    public static Tuple<Bitmap?, bool> CaptureDialog(bool isAuxiliary = false)
     {
-        if (IsCapturing)
-            return null;
-
         Bitmap? result = null;
+        bool isRightClick = false;
         var frame = new DispatcherFrame();
+
+        if (IsCapturing)
+            return Tuple.Create(result, false);
 
         IsCapturing = true;
 
@@ -72,10 +73,11 @@ public abstract class ScreenGrabber
 
         for (var i = 0; i < numberOfScreenGrabWindowsToCreate; i++)
         {
-            var view = new ScreenGrabView(bitmap =>
+            var view = new ScreenGrabView((Bitmap bitmap, bool rightClick) =>
             {
                 // 截图成功时保存结果并退出消息循环
                 result = bitmap;
+                isRightClick = rightClick;
                 frame.Continue = false;
             }, isAuxiliary)
             {
@@ -108,7 +110,7 @@ public abstract class ScreenGrabber
         // 阻塞等待用户完成截图或取消
         Dispatcher.PushFrame(frame);
 
-        return result;
+        return Tuple.Create(result, isRightClick);
     }
 
     /// <summary>
@@ -131,7 +133,7 @@ public abstract class ScreenGrabber
 
         for (var i = 0; i < numberOfScreenGrabWindowsToCreate; i++)
         {
-            var view = new ScreenGrabView(bitmap =>
+            var view = new ScreenGrabView((Bitmap bitmap, bool isRightMouse) =>
             {
                 // 截图成功时完成任务
                 _captureTaskCompletionSource?.TrySetResult(bitmap);

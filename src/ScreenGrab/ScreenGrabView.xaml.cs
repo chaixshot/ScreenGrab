@@ -1,10 +1,10 @@
-﻿using System.Drawing;
+﻿using ScreenGrab.Extensions;
+using ScreenGrab.Utilities;
+using System.Drawing;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using ScreenGrab.Extensions;
-using ScreenGrab.Utilities;
 using WpfScreenHelper;
 using Color = System.Windows.Media.Color;
 using Point = System.Windows.Point;
@@ -19,7 +19,7 @@ public partial class ScreenGrabView
 {
     #region Constructors
 
-    public ScreenGrabView(Action<Bitmap>? action, bool isAuxiliary = false)
+    public ScreenGrabView(Action<Bitmap, bool>? action, bool isAuxiliary = false)
     {
         InitializeComponent();
         _onImageCaptured = action;
@@ -55,7 +55,7 @@ public partial class ScreenGrabView
     private const double SelectBorderThickness = 2;
     private readonly Color _borderColor = Color.FromArgb(255, 146, 202, 244);
 
-    private readonly Action<Bitmap>? _onImageCaptured;
+    private readonly Action<Bitmap, bool>? _onImageCaptured;
     private readonly bool _isAuxiliary;
 
     #endregion Fields
@@ -241,12 +241,12 @@ public partial class ScreenGrabView
     private void RegionClickCanvas_MouseDown(object sender, MouseButtonEventArgs e)
     {
         // Right click to close
-        if (e.RightButton == MouseButtonState.Pressed)
-        {
-            CloseAllScreenGrabs();
-            OnCancel?.Invoke();
-            return;
-        }
+        //if (e.RightButton == MouseButtonState.Pressed)
+        //{
+        //    CloseAllScreenGrabs();
+        //    OnCancel?.Invoke();
+        //    return;
+        //}
 
         _isSelecting = true;
         SetAuxiliaryVisibility(false);
@@ -339,6 +339,7 @@ public partial class ScreenGrabView
         if (!_isSelecting || _dpiScale is null)
             return;
 
+        bool isRightClick = e.ChangedButton == MouseButton.Right;
         _isSelecting = false;
         CurrentScreen = null;
         CursorClipper.UnClipCursor();
@@ -388,7 +389,8 @@ public partial class ScreenGrabView
         // 截图并回调
         var bitmap = correctedRegion.GetRegionOfScreenAsBitmap();
         CloseAllScreenGrabs();
-        _onImageCaptured?.Invoke(bitmap);
+
+        _onImageCaptured?.Invoke(bitmap, isRightClick);
     }
 
     private void PanSelection(Point movingPoint)
