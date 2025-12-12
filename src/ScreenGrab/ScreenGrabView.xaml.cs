@@ -167,13 +167,13 @@ public partial class ScreenGrabView
             }
 
             // 刷新提示词
-            FreezeTb.Text = "取消冻结窗口";
+            FreezeTb.Text = "Unpause";
         }
         else
         {
             FreezeBgImage();
             // 刷新提示词
-            FreezeTb.Text = "冻结窗口";
+            FreezeTb.Text = "Paus";
         }
         _isFreezeHandle = false;
     }

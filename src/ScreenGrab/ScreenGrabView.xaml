@@ -64,18 +64,19 @@
         <Border
             x:Name="PromptMsg"
             Margin="15"
+            Padding="5"
             HorizontalAlignment="Left"
             VerticalAlignment="Bottom"
             Background="#424242"
-            BorderBrush="WhiteSmoke"
-            BorderThickness=".6"
+            BorderThickness="0"
+            CornerRadius="7"
             Opacity="0.9"
             Visibility="Collapsed">
             <local:AutoGrid
                 ChildMargin="3"
                 ChildVerticalAlignment="Center"
                 Columns="*, *"
-                RowCount="2"
+                RowCount="4"
                 RowHeight="30">
                 <Grid.Resources>
                     <Style TargetType="StackPanel">
@@ -86,18 +87,30 @@
                         <Setter Property="Foreground" Value="White" />
                         <Setter Property="FontSize" Value="16" />
                         <Setter Property="HorizontalAlignment" Value="Left" />
-
                     </Style>
                 </Grid.Resources>
-                <StackPanel>
-                    <local:UcCharacter DisplayChar="Shift" />
-                    <local:UcCharacter DisplayChar="🖱" />
+
+                <StackPanel HorizontalAlignment="Left">
+                    <local:UcCharacter DisplayChar="ESC" />
                 </StackPanel>
-                <TextBlock Text="移动选区" />
-                <StackPanel>
+                <TextBlock Text="Cancel" />
+
+                <StackPanel HorizontalAlignment="Left">
+                    <local:UcCharacter DisplayChar="Right Drag" />
+                </StackPanel>
+                <TextBlock Text="Configure Capture" />
+
+                <StackPanel HorizontalAlignment="Left">
+                    <local:UcCharacter DisplayChar="Shift" />
+                    <TextBlock Margin="1,0,1,0" Text="+" />
+                    <local:UcCharacter DisplayChar="Move Cursor" />
+                </StackPanel>
+                <TextBlock Text="Move Area" />
+
+                <StackPanel HorizontalAlignment="Left">
                     <local:UcCharacter DisplayChar="F" />
                 </StackPanel>
-                <TextBlock x:Name="FreezeTb" Text="取消冻结窗口" />
+                <TextBlock x:Name="FreezeTb" Text="Unpause" />
             </local:AutoGrid>
         </Border>
     </Grid>
