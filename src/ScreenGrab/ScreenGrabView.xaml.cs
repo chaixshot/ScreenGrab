@@ -173,7 +173,7 @@ public partial class ScreenGrabView
         {
             FreezeBgImage();
             // 刷新提示词
-            FreezeTb.Text = "Paus";
+            FreezeTb.Text = "Pause";
         }
         _isFreezeHandle = false;
     }
