@@ -19,7 +19,7 @@ public partial class ScreenGrabView
 {
     #region Constructors
 
-    public ScreenGrabView(Action<Bitmap, bool>? action, bool isAuxiliary = false)
+    public ScreenGrabView(Action<Bitmap, bool, Point, Point>? action, bool isAuxiliary = false)
     {
         InitializeComponent();
         _onImageCaptured = action;
@@ -38,7 +38,8 @@ public partial class ScreenGrabView
 
     #region Fields
 
-    private Point _clickedPoint;
+    private Point _startedPoint;
+    private Point _endedPoint;
     private DpiScale? _dpiScale;
     private bool _isSelecting;
     private bool _isShiftDown;
@@ -55,7 +56,7 @@ public partial class ScreenGrabView
     private const double SelectBorderThickness = 2;
     private readonly Color _borderColor = Color.FromArgb(255, 146, 202, 244);
 
-    private readonly Action<Bitmap, bool>? _onImageCaptured;
+    private readonly Action<Bitmap, bool, Point, Point>? _onImageCaptured;
     private readonly bool _isAuxiliary;
 
     #endregion Fields
@@ -135,7 +136,7 @@ public partial class ScreenGrabView
             case Key.LeftShift:
             case Key.RightShift:
                 _isShiftDown = false;
-                _clickedPoint = new Point(_clickedPoint.X + _xShiftDelta, _clickedPoint.Y + _yShiftDelta);
+                _startedPoint = new Point(_startedPoint.X + _xShiftDelta, _startedPoint.Y + _yShiftDelta);
                 break;
         }
     }
@@ -253,7 +254,7 @@ public partial class ScreenGrabView
         SetPromptMsgVisibility(false);
         RegionClickCanvas.CaptureMouse();
         CursorClipper.ClipCursor(this);
-        _clickedPoint = e.GetPosition(this);
+        _startedPoint = e.GetPosition(this);
         _selectBorder.Height = 2;
         _selectBorder.Width = 2;
 
@@ -271,11 +272,11 @@ public partial class ScreenGrabView
         _selectBorder.BorderThickness = new Thickness(SelectBorderThickness);
         _selectBorder.BorderBrush = new SolidColorBrush(_borderColor);
         _ = RegionClickCanvas.Children.Add(_selectBorder);
-        Canvas.SetLeft(_selectBorder, _clickedPoint.X);
-        Canvas.SetTop(_selectBorder, _clickedPoint.Y);
+        Canvas.SetLeft(_selectBorder, _startedPoint.X);
+        Canvas.SetTop(_selectBorder, _startedPoint.Y);
 
         // Initialize ClippingGeometry.Rect with a valid Rect
-        ClippingGeometry.Rect = new Rect(_clickedPoint, new Size(0, 0));
+        ClippingGeometry.Rect = new Rect(_startedPoint, new Size(0, 0));
 
         WindowUtilities.GetMousePosition(out var mousePoint);
         foreach (var screen in Screen.AllScreens)
@@ -290,13 +291,13 @@ public partial class ScreenGrabView
     {
         if (_isFreezeHandle) return;
 
-        var movingPoint = e.GetPosition(this);
+        _endedPoint = e.GetPosition(this);
 
         if (!_isSelecting)
         {
             // 检查鼠标是否在 PromptMsg 控件区域内
-            var isMouseInPromptMsg = movingPoint.X >= _promptMsgTopLeft.X && movingPoint.X <= _promptMsgBottomRight.X &&
-                                     movingPoint.Y >= _promptMsgTopLeft.Y && movingPoint.Y <= _promptMsgBottomRight.Y;
+            var isMouseInPromptMsg = _endedPoint.X >= _promptMsgTopLeft.X && _endedPoint.X <= _promptMsgBottomRight.X &&
+                                     _endedPoint.Y >= _promptMsgTopLeft.Y && _endedPoint.Y <= _promptMsgBottomRight.Y;
 
             SetPromptMsgVisibility(!isMouseInPromptMsg);
 
@@ -304,26 +305,26 @@ public partial class ScreenGrabView
             if (!_isAuxiliary) return;
 
             // Update the horizontal line to match the mouse Y position
-            HorizontalLine.Y1 = HorizontalLine.Y2 = movingPoint.Y;
+            HorizontalLine.Y1 = HorizontalLine.Y2 = _endedPoint.Y;
 
             // Update the vertical line to match the mouse X position
-            VerticalLine.X1 = VerticalLine.X2 = movingPoint.X;
+            VerticalLine.X1 = VerticalLine.X2 = _endedPoint.X;
             return;
         }
 
         if (Keyboard.Modifiers == ModifierKeys.Shift)
         {
-            PanSelection(movingPoint);
+            PanSelection(_endedPoint);
             return;
         }
 
         _isShiftDown = false;
 
-        var left = Math.Min(_clickedPoint.X, movingPoint.X);
-        var top = Math.Min(_clickedPoint.Y, movingPoint.Y);
+        var left = Math.Min(_startedPoint.X, _endedPoint.X);
+        var top = Math.Min(_startedPoint.Y, _endedPoint.Y);
 
-        _selectBorder.Height = Math.Max(_clickedPoint.Y, movingPoint.Y) - top;
-        _selectBorder.Width = Math.Max(_clickedPoint.X, movingPoint.X) - left;
+        _selectBorder.Height = Math.Max(_startedPoint.Y, _endedPoint.Y) - top;
+        _selectBorder.Width = Math.Max(_startedPoint.X, _endedPoint.X) - left;
         _selectBorder.Height += SelectBorderThickness;
         _selectBorder.Width += SelectBorderThickness;
 
@@ -390,7 +391,7 @@ public partial class ScreenGrabView
         var bitmap = correctedRegion.GetRegionOfScreenAsBitmap();
         CloseAllScreenGrabs();
 
-        _onImageCaptured?.Invoke(bitmap, isRightClick);
+        _onImageCaptured?.Invoke(bitmap, isRightClick, _startedPoint, _endedPoint);
     }
 
     private void PanSelection(Point movingPoint)

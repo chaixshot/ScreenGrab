@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Windows;
 using System.Windows.Threading;
 using WpfScreenHelper;
+using Point = System.Windows.Point;
 
 namespace ScreenGrab;
 
@@ -10,7 +11,7 @@ public abstract class ScreenGrabber
 {
     public static bool IsCapturing { get; private set; }
 
-    public static Action<Bitmap, bool>? OnCaptured { get; set; }
+    public static Action<Bitmap, bool, Point, Point>? OnCaptured { get; set; }
 
     private static TaskCompletionSource<Bitmap?>? _captureTaskCompletionSource;
 
@@ -56,14 +57,16 @@ public abstract class ScreenGrabber
     /// </summary>
     /// <param name="isAuxiliary">是否显示辅助线</param>
     /// <returns>返回捕获的 Bitmap，如果用户取消则返回 null</returns>
-    public static Tuple<Bitmap?, bool> CaptureDialog(bool isAuxiliary = false)
+    public static Tuple<Bitmap?, bool, Point, Point> CaptureDialog(bool isAuxiliary = false)
     {
         Bitmap? result = null;
         bool isRightClick = false;
         var frame = new DispatcherFrame();
+        Point startPoint = new();
+        Point endPoint = new();
 
         if (IsCapturing)
-            return Tuple.Create(result, false);
+            return Tuple.Create(result, false, new Point(), new Point());
 
         IsCapturing = true;
 
@@ -73,11 +76,13 @@ public abstract class ScreenGrabber
 
         for (var i = 0; i < numberOfScreenGrabWindowsToCreate; i++)
         {
-            var view = new ScreenGrabView((Bitmap bitmap, bool rightClick) =>
+            var view = new ScreenGrabView((Bitmap bitmap, bool rightClick, Point stPoint, Point edPoint) =>
             {
                 // 截图成功时保存结果并退出消息循环
                 result = bitmap;
                 isRightClick = rightClick;
+                startPoint = stPoint;
+                endPoint = edPoint;
                 frame.Continue = false;
             }, isAuxiliary)
             {
@@ -110,7 +115,7 @@ public abstract class ScreenGrabber
         // 阻塞等待用户完成截图或取消
         Dispatcher.PushFrame(frame);
 
-        return Tuple.Create(result, isRightClick);
+        return Tuple.Create(result, isRightClick, startPoint, endPoint);
     }
 
     /// <summary>
@@ -133,7 +138,7 @@ public abstract class ScreenGrabber
 
         for (var i = 0; i < numberOfScreenGrabWindowsToCreate; i++)
         {
-            var view = new ScreenGrabView((Bitmap bitmap, bool isRightMouse) =>
+            var view = new ScreenGrabView((Bitmap bitmap, bool rightClick, Point stPoint, Point edPoint) =>
             {
                 // 截图成功时完成任务
                 _captureTaskCompletionSource?.TrySetResult(bitmap);
