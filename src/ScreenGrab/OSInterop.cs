@@ -24,12 +24,27 @@ internal static partial class OSInterop
     public const int WM_KEYDOWN = 0x0100;
     public const int WM_KEYUP = 0x0101;
 
+    public const uint SWP_NOZORDER = 0x0004;
+    public const uint SWP_NOACTIVATE = 0x0010;
+    public const uint SWP_NOOWNERZORDER = 0x0200;
+
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     public static extern bool GetMonitorInfo(HandleRef hmonitor, [In] [Out] MONITORINFOEX info);
 
     [DllImport("user32.dll")]
     public static extern IntPtr MonitorFromWindow(HandleRef handle, int flags);
 #if NET7_0_OR_GREATER
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool SetWindowPos(
+        IntPtr hWnd,
+        IntPtr hWndInsertAfter,
+        int x,
+        int y,
+        int cx,
+        int cy,
+        uint uFlags);
+
     [LibraryImport("user32.dll")]
     public static partial int GetSystemMetrics(int smIndex);
 
@@ -43,6 +58,17 @@ internal static partial class OSInterop
 #else
     [DllImport("user32.dll", SetLastError = true)]
     public static extern int GetSystemMetrics(int smIndex);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool SetWindowPos(
+        IntPtr hWnd,
+        IntPtr hWndInsertAfter,
+        int x,
+        int y,
+        int cx,
+        int cy,
+        uint uFlags);
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

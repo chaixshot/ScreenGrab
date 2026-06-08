@@ -1,9 +1,12 @@
 ﻿using System.Drawing;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using ScreenGrab.Extensions;
+using ScreenGrab.Models;
 using ScreenGrab.Utilities;
 using WpfScreenHelper;
 using Color = System.Windows.Media.Color;
@@ -25,6 +28,27 @@ public partial class ScreenGrabView
         _onImageCaptured = action;
         _isAuxiliary = isAuxiliary;
         _preCapture = preCapture;
+    }
+
+    internal void SetCaptureTarget(ScreenCaptureTarget captureTarget)
+    {
+        _captureTarget = captureTarget;
+        _preCapture = captureTarget.PreCapture;
+
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        WindowState = WindowState.Normal;
+        SetWindowLayoutBounds(captureTarget.WpfBounds);
+    }
+
+    internal void ApplyTargetBounds()
+    {
+        if (_captureTarget is null)
+            return;
+
+        WindowState = WindowState.Normal;
+        SetWindowLayoutBounds(_captureTarget.WpfBounds);
+        ApplyTargetPhysicalBounds();
+        UpdateFullWindowRect();
     }
 
     #endregion Constructors
@@ -61,7 +85,8 @@ public partial class ScreenGrabView
 
     private readonly Action<Bitmap>? _onImageCaptured;
     private readonly bool _isAuxiliary;
-    private readonly ImageSource? _preCapture;
+    private ImageSource? _preCapture;
+    private ScreenCaptureTarget? _captureTarget;
 
     #endregion Fields
 
@@ -76,10 +101,26 @@ public partial class ScreenGrabView
         GC.Collect();
     }
 
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        ApplyTargetBounds();
+    }
+
+    protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
+    {
+        base.OnRenderSizeChanged(sizeInfo);
+        UpdateFullWindowRect();
+    }
+
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
-        WindowState = WindowState.Maximized;
-        FullWindow.Rect = new Rect(0, 0, Width, Height);
+        if (_captureTarget is null)
+            WindowState = WindowState.Maximized;
+        else
+            ApplyTargetBounds();
+
+        UpdateFullWindowRect();
         KeyDown += ScreenGrab_KeyDown;
         KeyUp += ScreenGrab_KeyUp;
 
@@ -160,10 +201,67 @@ public partial class ScreenGrabView
         }
     }
 
+    private void SetWindowLayoutBounds(Rect bounds)
+    {
+        Left = bounds.Left;
+        Top = bounds.Top;
+        Width = Math.Max(1, bounds.Width);
+        Height = Math.Max(1, bounds.Height);
+    }
+
+    private void ApplyTargetPhysicalBounds()
+    {
+        if (_captureTarget is null)
+            return;
+
+        var bounds = _captureTarget.PhysicalBounds;
+        var handle = new WindowInteropHelper(this).EnsureHandle();
+        SetWindowPhysicalBounds(handle, bounds);
+
+#if DEBUG
+        var actualScreen = Screen.FromHandle(handle);
+        if (!actualScreen.Equals(_captureTarget.Screen))
+        {
+            Debug.WriteLine(
+                $"ScreenGrab target monitor mismatch. Target={_captureTarget.Screen.DeviceName} {FormatBounds(bounds)}, Actual={actualScreen.DeviceName} {FormatBounds(actualScreen.Bounds)}");
+            SetWindowPhysicalBounds(handle, bounds);
+        }
+#endif
+    }
+
+    private static void SetWindowPhysicalBounds(IntPtr handle, Rect bounds)
+    {
+        OSInterop.SetWindowPos(
+            handle,
+            IntPtr.Zero,
+            (int)Math.Round(bounds.Left),
+            (int)Math.Round(bounds.Top),
+            Math.Max(1, (int)Math.Round(bounds.Width)),
+            Math.Max(1, (int)Math.Round(bounds.Height)),
+            OSInterop.SWP_NOZORDER | OSInterop.SWP_NOACTIVATE | OSInterop.SWP_NOOWNERZORDER);
+    }
+
+    private void UpdateFullWindowRect()
+    {
+        if (FullWindow is null)
+            return;
+
+        var width = ActualWidth > 0 ? ActualWidth : Width;
+        var height = ActualHeight > 0 ? ActualHeight : Height;
+        FullWindow.Rect = new Rect(0, 0, width, height);
+    }
+
+#if DEBUG
+    private static string FormatBounds(Rect bounds)
+    {
+        return $"X={bounds.X}, Y={bounds.Y}, Width={bounds.Width}, Height={bounds.Height}";
+    }
+#endif
+
     private void SetImageToBackground()
     {
         FreezeBgImage();
-        BackgroundImage.Source = this.GetWindowBoundsImage();
+        BackgroundImage.Source = _captureTarget?.CaptureScreenImage() ?? this.GetWindowBoundsImage();
         BackgroundBrush.Opacity = 0.2;
     }
 
@@ -316,12 +414,18 @@ public partial class ScreenGrabView
         // Initialize ClippingGeometry.Rect with a valid Rect
         ClippingGeometry.Rect = new Rect(_clickedPoint, new Size(0, 0));
 
-        WindowUtilities.GetMousePosition(out var mousePoint);
-        foreach (var screen in Screen.AllScreens)
+        CurrentScreen = _captureTarget?.Screen;
+        if (CurrentScreen is null && WindowUtilities.GetMousePosition(out var mousePoint))
         {
-            var bound = screen.ScaledBounds();
-            if (bound.Contains(mousePoint))
+            foreach (var screen in Screen.AllScreens)
+            {
+                var bound = screen.Bounds;
+                if (!bound.Contains(mousePoint))
+                    continue;
+
                 CurrentScreen = screen;
+                break;
+            }
         }
     }
 
@@ -427,7 +531,7 @@ public partial class ScreenGrabView
             (int)scaledHeight);
 
         // 计算绝对屏幕位置
-        var absPosPoint = this.GetAbsolutePosition();
+        var absPosPoint = _captureTarget?.PhysicalBounds.TopLeft ?? this.GetAbsolutePosition();
         var correctedRegion = regionScaled with
         {
             X = (int)absPosPoint.X + regionScaled.Left,
