@@ -61,13 +61,23 @@ public static class ImageExtensions
         return bitmapImage;
     }
 
-    public static Bitmap GetRegionOfScreenAsBitmap(this Rectangle region)
+    /// <summary>
+    /// 截取指定物理屏幕区域为位图。
+    /// </summary>
+    /// <param name="region">虚拟屏幕物理像素坐标区域。</param>
+    /// <param name="padImage">
+    /// 是否对过小截图进行 padding 扩展（默认 <c>true</c>，保持历史行为）。
+    /// 当调用方需要"位图尺寸 == 选区尺寸"（如贴回选区原位置）时应传 <c>false</c>，
+    /// 否则 <see cref="PadImage"/> 会把 &lt;64px 的截图扩展为更大画布，导致原始内容被缩小。
+    /// </param>
+    public static Bitmap GetRegionOfScreenAsBitmap(this Rectangle region, bool padImage = true)
     {
         Bitmap bmp = new(region.Width, region.Height, PixelFormat.Format32bppArgb);
         using var g = Graphics.FromImage(bmp);
 
         g.CopyFromScreen(region.Left, region.Top, 0, 0, bmp.Size, CopyPixelOperation.SourceCopy);
-        bmp = bmp.PadImage();
+        if (padImage)
+            bmp = bmp.PadImage();
 
         return bmp;
     }

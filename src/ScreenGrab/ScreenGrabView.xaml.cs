@@ -22,20 +22,22 @@ public partial class ScreenGrabView
 {
     #region Constructors
 
-    public ScreenGrabView(Action<Bitmap>? action, bool isAuxiliary = false, ImageSource? preCapture = null)
+    public ScreenGrabView(Action<Bitmap>? action, bool isAuxiliary = false, ImageSource? preCapture = null, bool padImage = true)
     {
         InitializeComponent();
         _onImageCaptured = action;
         _isAuxiliary = isAuxiliary;
         _preCapture = preCapture;
+        _padImage = padImage;
     }
 
-    public ScreenGrabView(Action<ScreenCaptureResult>? action, bool isAuxiliary = false, ImageSource? preCapture = null)
+    public ScreenGrabView(Action<ScreenCaptureResult>? action, bool isAuxiliary = false, ImageSource? preCapture = null, bool padImage = true)
     {
         InitializeComponent();
         _onImageCapturedWithRegion = action;
         _isAuxiliary = isAuxiliary;
         _preCapture = preCapture;
+        _padImage = padImage;
     }
 
     internal void SetCaptureTarget(ScreenCaptureTarget captureTarget)
@@ -94,6 +96,7 @@ public partial class ScreenGrabView
     private readonly Action<Bitmap>? _onImageCaptured;
     private readonly Action<ScreenCaptureResult>? _onImageCapturedWithRegion;
     private readonly bool _isAuxiliary;
+    private readonly bool _padImage = true;
     private ImageSource? _preCapture;
     private ScreenCaptureTarget? _captureTarget;
 
@@ -548,7 +551,7 @@ public partial class ScreenGrabView
         };
 
         // 截图并回调
-        var bitmap = correctedRegion.GetRegionOfScreenAsBitmap();
+        var bitmap = correctedRegion.GetRegionOfScreenAsBitmap(_padImage);
         CloseAllScreenGrabs();
 
         // 优先回传带选区物理坐标的结果，兼容仅接收 Bitmap 的旧回调

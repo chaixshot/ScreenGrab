@@ -113,8 +113,13 @@ public abstract class ScreenGrabber
     /// 异步方式捕获屏幕截图，返回截图位图与选区物理坐标。
     /// </summary>
     /// <param name="isAuxiliary">是否显示辅助线</param>
+    /// <param name="padImage">
+    /// 是否对过小截图进行 padding 扩展（默认 <c>true</c>，保持历史行为）。
+    /// 当调用方需要"位图尺寸 == 选区尺寸"（如贴回选区原位置）时应传 <c>false</c>，
+    /// 否则 &lt;64px 的截图会被扩展为更大画布，导致原始内容被缩小。
+    /// </param>
     /// <returns>返回截图结果（含选区物理坐标），如果用户取消则返回 null</returns>
-    public static Task<ScreenCaptureResult?> CaptureWithRegionAsync(bool isAuxiliary = false)
+    public static Task<ScreenCaptureResult?> CaptureWithRegionAsync(bool isAuxiliary = false, bool padImage = true)
     {
         if (IsCapturing)
             return Task.FromResult<ScreenCaptureResult?>(null);
@@ -129,7 +134,7 @@ public abstract class ScreenGrabber
             {
                 // 截图成功时完成任务
                 _captureWithRegionTaskCompletionSource?.TrySetResult(result);
-            }, isAuxiliary)
+            }, isAuxiliary, padImage: padImage)
             {
                 OnGrabClose = () =>
                 {
