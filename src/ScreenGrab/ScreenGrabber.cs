@@ -14,6 +14,7 @@ public abstract class ScreenGrabber
     public static Action<Bitmap>? OnCaptured { get; set; }
 
     private static TaskCompletionSource<Bitmap?>? _captureTaskCompletionSource;
+    private static TaskCompletionSource<ScreenCaptureResult?>? _captureWithRegionTaskCompletionSource;
 
     public static void Capture(bool isAuxiliary = false)
     {
@@ -106,6 +107,43 @@ public abstract class ScreenGrabber
         ShowScreenGrabViews(captureTargets, allScreenGrab);
 
         return _captureTaskCompletionSource.Task;
+    }
+
+    /// <summary>
+    /// 异步方式捕获屏幕截图，返回截图位图与选区物理坐标。
+    /// </summary>
+    /// <param name="isAuxiliary">是否显示辅助线</param>
+    /// <returns>返回截图结果（含选区物理坐标），如果用户取消则返回 null</returns>
+    public static Task<ScreenCaptureResult?> CaptureWithRegionAsync(bool isAuxiliary = false)
+    {
+        if (IsCapturing)
+            return Task.FromResult<ScreenCaptureResult?>(null);
+
+        _captureWithRegionTaskCompletionSource = new TaskCompletionSource<ScreenCaptureResult?>();
+
+        IsCapturing = true;
+
+        var captureTargets = Screen.AllScreens.ToList().CreateCaptureTargets();
+        var allScreenGrab = CreateScreenGrabViews(captureTargets, _ =>
+            new ScreenGrabView(result =>
+            {
+                // 截图成功时完成任务
+                _captureWithRegionTaskCompletionSource?.TrySetResult(result);
+            }, isAuxiliary)
+            {
+                OnGrabClose = () =>
+                {
+                    IsCapturing = false;
+                },
+                OnCancel = () =>
+                {
+                    _captureWithRegionTaskCompletionSource?.TrySetResult(null);
+                }
+            });
+
+        ShowScreenGrabViews(captureTargets, allScreenGrab);
+
+        return _captureWithRegionTaskCompletionSource.Task;
     }
 
     private static List<ScreenGrabView> CreateScreenGrabViews(

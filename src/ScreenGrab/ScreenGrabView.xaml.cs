@@ -30,6 +30,14 @@ public partial class ScreenGrabView
         _preCapture = preCapture;
     }
 
+    public ScreenGrabView(Action<ScreenCaptureResult>? action, bool isAuxiliary = false, ImageSource? preCapture = null)
+    {
+        InitializeComponent();
+        _onImageCapturedWithRegion = action;
+        _isAuxiliary = isAuxiliary;
+        _preCapture = preCapture;
+    }
+
     internal void SetCaptureTarget(ScreenCaptureTarget captureTarget)
     {
         _captureTarget = captureTarget;
@@ -84,6 +92,7 @@ public partial class ScreenGrabView
     private readonly Color _borderColor = Color.FromArgb(255, 146, 202, 244);
 
     private readonly Action<Bitmap>? _onImageCaptured;
+    private readonly Action<ScreenCaptureResult>? _onImageCapturedWithRegion;
     private readonly bool _isAuxiliary;
     private ImageSource? _preCapture;
     private ScreenCaptureTarget? _captureTarget;
@@ -541,7 +550,12 @@ public partial class ScreenGrabView
         // 截图并回调
         var bitmap = correctedRegion.GetRegionOfScreenAsBitmap();
         CloseAllScreenGrabs();
-        _onImageCaptured?.Invoke(bitmap);
+
+        // 优先回传带选区物理坐标的结果，兼容仅接收 Bitmap 的旧回调
+        if (_onImageCapturedWithRegion is not null)
+            _onImageCapturedWithRegion.Invoke(new ScreenCaptureResult(bitmap, correctedRegion));
+        else
+            _onImageCaptured?.Invoke(bitmap);
     }
 
     private void PanSelection(Point movingPoint)
