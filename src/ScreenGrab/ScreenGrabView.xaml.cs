@@ -1,13 +1,13 @@
-﻿using System.Drawing;
+﻿using ScreenGrab.Extensions;
+using ScreenGrab.Models;
+using ScreenGrab.Utilities;
 using System.Diagnostics;
+using System.Drawing;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
-using ScreenGrab.Extensions;
-using ScreenGrab.Models;
-using ScreenGrab.Utilities;
 using WpfScreenHelper;
 using Color = System.Windows.Media.Color;
 using Point = System.Windows.Point;
@@ -22,7 +22,7 @@ public partial class ScreenGrabView
 {
     #region Constructors
 
-    public ScreenGrabView(Action<Bitmap>? action, bool isAuxiliary = false, ImageSource? preCapture = null, bool padImage = true)
+    public ScreenGrabView(Action<Bitmap, bool, Point, Point>? action, bool isAuxiliary = false, ImageSource? preCapture = null, bool padImage = true)
     {
         InitializeComponent();
         _onImageCaptured = action;
@@ -73,7 +73,8 @@ public partial class ScreenGrabView
 
     #region Fields
 
-    private Point _clickedPoint;
+    private Point _startedPoint;
+    private Point _endedPoint;
     private DpiScale? _dpiScale;
     private bool _isSelecting;
     private bool _isSpaceDown;
@@ -93,7 +94,7 @@ public partial class ScreenGrabView
     private const double SelectBorderThickness = 2;
     private readonly Color _borderColor = Color.FromArgb(255, 146, 202, 244);
 
-    private readonly Action<Bitmap>? _onImageCaptured;
+    private readonly Action<Bitmap, bool, Point, Point>? _onImageCaptured;
     private readonly Action<ScreenCaptureResult>? _onImageCapturedWithRegion;
     private readonly bool _isAuxiliary;
     private readonly bool _padImage = true;
@@ -207,7 +208,7 @@ public partial class ScreenGrabView
             case Key.Space:
                 _isSpaceDown = false;
                 _isPanning = false;
-                _clickedPoint = new Point(_clickedPoint.X + _xSpaceDelta, _clickedPoint.Y + _ySpaceDelta);
+                _startedPoint = new Point(_startedPoint.X + _xSpaceDelta, _startedPoint.Y + _ySpaceDelta);
                 e.Handled = true;
                 break;
         }
@@ -381,13 +382,13 @@ public partial class ScreenGrabView
     private void RegionClickCanvas_MouseDown(object sender, MouseButtonEventArgs e)
     {
         // Right click to close
-        if (e.RightButton == MouseButtonState.Pressed)
-        {
-            CloseAllScreenGrabs();
-            OnCancel?.Invoke();
-            e.Handled = true;
-            return;
-        }
+        //if (e.RightButton == MouseButtonState.Pressed)
+        //{
+        //    CloseAllScreenGrabs();
+        //    OnCancel?.Invoke();
+        //    e.Handled = true;
+        //    return;
+        //}
 
         _isSelecting = true;
         SetAuxiliaryVisibility(false);
@@ -402,7 +403,7 @@ public partial class ScreenGrabView
 
         RegionClickCanvas.CaptureMouse();
         CursorClipper.ClipCursor(this);
-        _clickedPoint = e.GetPosition(this);
+        _startedPoint = e.GetPosition(this);
         _selectBorder.Height = 2;
         _selectBorder.Width = 2;
 
@@ -420,11 +421,13 @@ public partial class ScreenGrabView
         _selectBorder.BorderThickness = new Thickness(SelectBorderThickness);
         _selectBorder.BorderBrush = new SolidColorBrush(_borderColor);
         _ = RegionClickCanvas.Children.Add(_selectBorder);
-        Canvas.SetLeft(_selectBorder, _clickedPoint.X);
-        Canvas.SetTop(_selectBorder, _clickedPoint.Y);
+        Canvas.SetLeft(_selectBorder, _startedPoint.X);
+        Canvas.SetTop(_selectBorder, _startedPoint.Y);
+        Canvas.SetLeft(_selectBorder, _startedPoint.X);
+        Canvas.SetTop(_selectBorder, _startedPoint.Y);
 
         // Initialize ClippingGeometry.Rect with a valid Rect
-        ClippingGeometry.Rect = new Rect(_clickedPoint, new Size(0, 0));
+        ClippingGeometry.Rect = new Rect(_startedPoint, new Size(0, 0));
 
         CurrentScreen = _captureTarget?.Screen;
         if (CurrentScreen is null && WindowUtilities.GetMousePosition(out var mousePoint))
@@ -445,13 +448,13 @@ public partial class ScreenGrabView
     {
         if (_isFreezeHandle) return;
 
-        var movingPoint = e.GetPosition(this);
+        _endedPoint = e.GetPosition(this);
 
         if (!_isSelecting)
         {
             // 检查鼠标是否在 PromptMsg 控件区域内
-            var isMouseInPromptMsg = movingPoint.X >= _promptMsgTopLeft.X && movingPoint.X <= _promptMsgBottomRight.X &&
-                                        movingPoint.Y >= _promptMsgTopLeft.Y && movingPoint.Y <= _promptMsgBottomRight.Y;
+            var isMouseInPromptMsg = _endedPoint.X >= _promptMsgTopLeft.X && _endedPoint.X <= _promptMsgBottomRight.X &&
+                                        _endedPoint.Y >= _promptMsgTopLeft.Y && _endedPoint.Y <= _promptMsgBottomRight.Y;
 
             SetPromptMsgVisibility(!isMouseInPromptMsg);
 
@@ -459,18 +462,18 @@ public partial class ScreenGrabView
             if (!_isAuxiliary) return;
 
             // Update the horizontal line to match the mouse Y position
-            HorizontalLine.Y1 = HorizontalLine.Y2 = movingPoint.Y;
+            HorizontalLine.Y1 = HorizontalLine.Y2 = _endedPoint.Y;
 
             // Update the vertical line to match the mouse X position
-            VerticalLine.X1 = VerticalLine.X2 = movingPoint.X;
+            VerticalLine.X1 = VerticalLine.X2 = _endedPoint.X;
             return;
         }
 
         // 计算当前选择区域
-        var left = Math.Min(_clickedPoint.X, movingPoint.X);
-        var top = Math.Min(_clickedPoint.Y, movingPoint.Y);
-        var right = Math.Max(_clickedPoint.X, movingPoint.X);
-        var bottom = Math.Max(_clickedPoint.Y, movingPoint.Y);
+        var left = Math.Min(_startedPoint.X, _endedPoint.X);
+        var top = Math.Min(_startedPoint.Y, _endedPoint.Y);
+        var right = Math.Max(_startedPoint.X, _endedPoint.X);
+        var bottom = Math.Max(_startedPoint.Y, _endedPoint.Y);
 
         // 使用缓存的边界检查选择区域是否与 PressedPromptMsg 控件重叠
         var isOverlapping = !(right < _pressedPromptMsgTopLeft.X || left > _pressedPromptMsgBottomRight.X ||
@@ -480,14 +483,14 @@ public partial class ScreenGrabView
 
         if (_isSpaceDown)
         {
-            PanSelection(movingPoint);
+            PanSelection(_endedPoint);
             return;
         }
 
         _isSpaceDown = false;
 
-        _selectBorder.Height = Math.Max(_clickedPoint.Y, movingPoint.Y) - top;
-        _selectBorder.Width = Math.Max(_clickedPoint.X, movingPoint.X) - left;
+        _selectBorder.Height = Math.Max(_startedPoint.Y, _endedPoint.Y) - top;
+        _selectBorder.Width = Math.Max(_startedPoint.X, _endedPoint.X) - left;
         _selectBorder.Height += SelectBorderThickness;
         _selectBorder.Width += SelectBorderThickness;
 
@@ -503,6 +506,7 @@ public partial class ScreenGrabView
         if (!_isSelecting || _dpiScale is null)
             return;
 
+        bool isRightClick = e.ChangedButton == MouseButton.Right;
         _isSelecting = false;
         _isPanning = false;
         CurrentScreen = null;
@@ -558,7 +562,7 @@ public partial class ScreenGrabView
         if (_onImageCapturedWithRegion is not null)
             _onImageCapturedWithRegion.Invoke(new ScreenCaptureResult(bitmap, correctedRegion));
         else
-            _onImageCaptured?.Invoke(bitmap);
+            _onImageCaptured?.Invoke(bitmap, isRightClick, _startedPoint, _endedPoint);
     }
 
     private void PanSelection(Point movingPoint)
