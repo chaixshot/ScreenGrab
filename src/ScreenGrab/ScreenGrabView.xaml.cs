@@ -298,13 +298,13 @@ public partial class ScreenGrabView
             }
 
             // 刷新提示词
-            FreezeTb.Text = "取消冻结窗口";
+            FreezeTb.Text = "Unpause";
         }
         else
         {
             FreezeBgImage();
             // 刷新提示词
-            FreezeTb.Text = "冻结窗口";
+            FreezeTb.Text = "Pause";
         }
         _isFreezeHandle = false;
     }
@@ -342,10 +342,10 @@ public partial class ScreenGrabView
     private void SetPromptMsgVisibility(bool isVisible)
     {
         var setVisibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
-        if (PromptMsg.Visibility == setVisibility)
+        if (PressedPromptMsg.Visibility == setVisibility)
             return;
 
-        PromptMsg.Visibility = setVisibility;
+        PressedPromptMsg.Visibility = setVisibility;
     }
 
     private void SetPressedPromptMsgVisibility(bool isVisible)
@@ -374,9 +374,9 @@ public partial class ScreenGrabView
         SetPromptMsgVisibility(true);
 
         // 获取 PromptMsg 控件的边界
-        _promptMsgTopLeft = PromptMsg.TranslatePoint(new Point(0, 0), this);
+        _promptMsgTopLeft = PressedPromptMsg.TranslatePoint(new Point(0, 0), this);
         _promptMsgBottomRight =
-            PromptMsg.TranslatePoint(new Point(PromptMsg.ActualWidth, PromptMsg.ActualHeight), this);
+            PressedPromptMsg.TranslatePoint(new Point(PressedPromptMsg.ActualWidth, PressedPromptMsg.ActualHeight), this);
     }
 
     private void RegionClickCanvas_MouseDown(object sender, MouseButtonEventArgs e)
